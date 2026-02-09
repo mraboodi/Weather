@@ -43,7 +43,7 @@
                                 : "bg-gradient-to-r from-sky-400 to-blue-500";
 
                                 <span class=" -right-4 px-2 text-xs font-bold text-white
-                                                                  rounded-full shadow-md @badgeClass">
+                                                                              rounded-full shadow-md @badgeClass">
                                     @FavoriteState.Count
                                     @if (FavoriteState.Count >= WeatherOptions.Value.FavoriteMaxLimit)
                                     {
@@ -70,7 +70,10 @@
             </div>
 
             <div class="nav-item px-3 mt-2">
-                <span class="text-sm font-medium">@AuthStateService.GetFirstName()</span>
+                <span class="text-sm text-white font-medium mb-2 truncate block max-w-[200px]"
+                      title="@AuthStateService.GetEmail()">
+                    <i class="fas fa-envelope me-2"></i>@AuthStateService.GetEmail()
+                </span>
 
                 <button type="button" @onclick="Logout"
                         class="px-3 py-1 rounded bg-red-500 w-full text-white hover:bg-red-600 flex items-center gap-1">
@@ -90,10 +93,10 @@
 </div>
 
 @code {
-    
+
     protected override async Task OnInitializedAsync()
     {
-        AuthStateService.OnChange += HandleAuthChanged;       
+        AuthStateService.OnChange += HandleAuthChanged;
     }
 
     private async void HandleAuthChanged()
