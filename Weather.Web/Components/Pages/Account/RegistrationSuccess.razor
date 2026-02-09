@@ -65,15 +65,22 @@
             </div>
 
             <!-- Auto-redirect notice (only for normal users) -->
-            @if (!AuthStateService.UserHasAnyRole(UserRoles.SuperUser, UserRoles.Administrator))
-            {
-                <div class="text-center mt-4">
-                    <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div>
+
+            <div class="text-center mt-4">
+                <div class="spinner-border spinner-border-sm text-success me-2" role="status"></div>
+                @if (!AuthStateService.UserHasAnyRole(UserRoles.SuperUser, UserRoles.Administrator))
+                {
                     <span class="text-muted">
                         Redirecting to login page automatically...
                     </span>
-                </div>
-            }
+                }
+                else
+                {
+                    <span class="text-muted">
+                        Redirecting to register new user page
+                    </span>
+                }
+            </div>
         </div>
     </div>
 </div>
@@ -84,7 +91,7 @@
     {
         if (!firstRender) return;
 
-         await Task.Delay(5000);
+        await Task.Delay(5000);
         if (AuthStateService.UserHasAnyRole(UserRoles.SuperUser, UserRoles.Administrator))
             Nav.NavigateTo("/register");
         else

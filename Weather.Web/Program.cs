@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
+using Microsoft.AspNetCore.Localization;
+using System.Globalization;
 using Weather.Models.Configuration;
 using Weather.Web.Components;
 using Weather.Web.Interfaces;
@@ -66,6 +68,16 @@ builder.Services.AddCascadingAuthenticationState();
 
 
 var app = builder.Build();
+
+var supportedCultures = new[] { CultureInfo.InvariantCulture };
+var localizationOptions = new RequestLocalizationOptions
+{
+	DefaultRequestCulture = new RequestCulture(CultureInfo.InvariantCulture),
+	SupportedCultures = supportedCultures,
+	SupportedUICultures = supportedCultures
+};
+app.UseRequestLocalization(localizationOptions);
+
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

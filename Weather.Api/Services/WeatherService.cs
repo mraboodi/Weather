@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Globalization;
+using System.Text.Json;
 using Weather.Api.Helpers;
 using Weather.Api.Interfaces;
 using Weather.Models.DTOs;
@@ -22,7 +23,11 @@ namespace Weather.Api.Services
 
 				// 1. Step Two: Get Forecast using Coordinates and timeZone (refer to external api documentation)
 				var encodedTimeZone = Uri.EscapeDataString(timeZone); // "Asia/Singapore" → "Asia%2FSingapore"
-				var weatherUrl = $"{baseForcastAddress}?latitude={latitude}&longitude={longitude}" +
+				//var weatherUrl = $"{baseForcastAddress}?latitude={latitude}&longitude={longitude}" +
+				//				 $"&daily=weather_code,temperature_2m_max,temperature_2m_min,rain_sum,apparent_temperature_max,apparent_temperature_min" +
+				//				 $"&timezone={encodedTimeZone}&forecast_days={forcastMaxLimit}&format=json&timeformat=unixtime";
+
+				var weatherUrl = $"{baseForcastAddress}?latitude={latitude.ToString(CultureInfo.InvariantCulture)}&longitude={longitude.ToString(CultureInfo.InvariantCulture)}" +
 								 $"&daily=weather_code,temperature_2m_max,temperature_2m_min,rain_sum,apparent_temperature_max,apparent_temperature_min" +
 								 $"&timezone={encodedTimeZone}&forecast_days={forcastMaxLimit}&format=json&timeformat=unixtime";
 

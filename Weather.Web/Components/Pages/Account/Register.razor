@@ -236,13 +236,17 @@
                             </div>
                         </div> *@
 
+
                         <!-- Login Link -->
-                        <div class="text-center">
-                            <p class="mb-0">
-                                Already have an account?
-                                <a href="/login" class="text-decoration-none fw-semibold">Sign In</a>
-                            </p>
-                        </div>
+                        @if (!AuthState.IsAuthenticated)
+                        {
+                            <div class="text-center">
+                                <p class="mb-0">
+                                    Already have an account?
+                                    <a href="/login" class="text-decoration-none fw-semibold">Sign In</a>
+                                </p>
+                            </div>
+                        }
                     </EditForm>
                 </div>
             </div>
