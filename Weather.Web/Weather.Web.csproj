@@ -26,7 +26,7 @@
        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
      </Content>
    </ItemGroup>
-	<Target Name="Tailwind" BeforeTargets="Build">
+	<!--<Target Name="Tailwind" BeforeTargets="Build">
 		<Exec Command="npx @tailwindcss/cli -i ./wwwroot/css/tailwind/base.css -o ./wwwroot/css/app.min.css" />
-	</Target>
+	</Target>-->
 </Project>
