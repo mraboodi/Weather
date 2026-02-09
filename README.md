@@ -100,7 +100,7 @@ Weather (Solution)
 ### Prerequisites
 
 - Visual Studio 2022
-- .NET 8 SDK  
+- .NET 8 SDK
 - MySql or SQL Server Engine  
 - Tailwind, you can install it using: `install tailwindcss @tailwindcss/cli`
 
@@ -111,15 +111,14 @@ Weather (Solution)
       -- builder.Services.AddDbContext<AppDbContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
       ++ builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
       ```
-2. Create an empty Databse (say `Weather`) using the engine/manger you set in point 1, 
-3. Update the connection string in `appsettings.json`:
+2. Update the connection string in `appsettings.json`:
 
 ```json
 "ConnectionStrings": {
     "DefaultConnection": "Data Source=BRK;Initial Catalog=Weather;Integrated Security=True;Pooling=False;Encrypt=False;Trust Server Certificate=True"
 }
 ```
-4. Optionaly, adjust the other configuration in the `appsettings.json`, example:
+3. Optionaly, adjust the other configuration in the `appsettings.json`, example:
 ```json
 
 "AdminUser": {
@@ -132,14 +131,6 @@ Weather (Solution)
 }
 
 ```
-4. Run the API project (or Solution):
-```bash
-dotnet run --project Weather.Api
-```
- If you set pont 1-5, right the Databes should be auto seeded with user roles and based AdminUser account, defined in point No.4:
-
-- The API will start at `https://localhost:44334/`
-
 
 ### Frontend Setup (Weather.Web)
 
@@ -151,13 +142,20 @@ dotnet run --project Weather.Api
 }
 ```
 
-2. Run the Blazor Server project (or Solution):
+### Running Both Solution
 
-```bash
-dotnet run --project Weather.Web
-```
+1. You can run the solution (both FE and BE Apps) by presseing `Start` from Visual Studio IDE.
+2. Note: Make sure that FE APP has the base address (including port) of the BE App by adjusting it in `appsettings.json` of FE APP.
 
-3. Open your browser at `https://localhost:5001` (or the port displayed in terminal).
+- The BE APP should ideally start at `https://localhost:44334/`
+- The FE APP should ideally start at `https://localhost:44381/`
+- You can start login to the website using the following default account:
+  ```
+    Username: admin@weather.local
+    Password: Admin@321
+  ```
+  Then after succefull login, you can create your prefered users (with Super or Simple user role) by:
+   - Going to `Add User` from the sidebar menu.
 
 ---
 
