@@ -12,3 +12,4 @@ namespace Weather.Models.Configuration
 	}
 
 }
+ 

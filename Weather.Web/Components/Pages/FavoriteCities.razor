@@ -24,58 +24,65 @@
             </h1>
         </div>
 
-        <!-- Cities Grid -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        @if (isProcessing)
+        {
+            <div class="flex justify-center items-center h-64">
+                <div class="animate-spin rounded-full h-16 w-16 border-4 border-sky-200 border-t-sky-500"></div>
+            </div>
+        }
+        else
+        {
+            <!-- Cities Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                @foreach (var city in Cities)
+                {
+                    <div class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-md overflow-hidden
+                                    transform transition-all duration-300 ease-out
+                                    hover:-translate-y-3 hover:scale-105 hover:shadow-2xl relative group cursor-pointer @(isProcessing ? "opacity-50 pointer-events-none" : "")"
+                         @onclick="() => ToggleForecast(city)">
 
-            @foreach (var city in Cities)
-            {
-                <div class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-md overflow-hidden
-                    transform transition-all duration-300 ease-out
-                    hover:-translate-y-3 hover:scale-105
-                            hover:shadow-2xl relative group cursor-pointer" @onclick="() => ToggleForecast(city)">
+                        <!-- Remove Button -->
+                        <button @onclick="() => RemoveCity(city)" @onclick:stopPropagation
+                                class="absolute top-3 right-3 w-9 h-9 flex items-center justify-center
+                                       bg-red-500 text-white rounded-full shadow-md z-10
+                                       /* Default (Mobile): Visible */
+                                       block
+                                       /* Desktop (md = 768px+): Hide by default, show only on group-hover */
+                                       md:hidden md:group-hover:flex
+                                       transition-all duration-200"
+                                style="border-radius: 10px">
+                            <span class="text-lg font-bold">✕</span>
+                        </button>
 
-                    <!-- Remove Button -->
-                    <button @onclick="() => RemoveCity(city)" @onclick:stopPropagation
-                            class="absolute top-3 right-3 w-9 h-9 flex items-center justify-center
-                       bg-red-500 text-white rounded-full shadow-md z-10
-                       /* Default (Mobile): Visible */
-                       block
-                       /* Desktop (md = 768px+): Hide by default, show only on group-hover */
-                       md:hidden md:group-hover:flex
-                       transition-all duration-200"
-                            style="border-radius: 10px">
-                        <span class="text-lg font-bold">✕</span>
-                    </button>
+                        <!-- City Weather Content -->
+                        <div class="p-5 text-center">
+                            <div class="flex justify-center mb-2">
+                                <img src="https://flagcdn.com/w80/@(city.CountryCode.ToLower()).png"
+                                     alt="@city.Name"
+                                     class="w-10 shadow-sm rounded-sm" />
+                            </div>
 
-                    <!-- City Weather Content -->
-                    <div class="p-5 text-center">
-                        <div class="flex justify-center mb-2">
-                            <img src="https://flagcdn.com/w80/@(city.CountryCode.ToLower()).png"
-                                 alt="@city.Name"
-                                 class="w-10 shadow-sm rounded-sm" />
+                            <div class="text-4xl my-2">
+                                @city.Name
+                            </div>
+
+                            <div class="text-4xl my-2">
+                                @forcastService.GetWeatherIcon(city.weathercode)
+                            </div>
+
+                            <div class="text-xl font-bold text-gray-900">
+                                @city.Temperature°C
+                            </div>
+
+                            <p class="text-sm text-gray-600">
+                                @forcastService.GetSummery(city.weathercode)
+                            </p>
                         </div>
-
-                        <div class="text-4xl my-2">
-                            @city.Name
-                        </div>
-
-                        <div class="text-4xl my-2">
-                            @forcastService.GetWeatherIcon(city.weathercode)
-                        </div>
-
-                        <div class="text-xl font-bold text-gray-900">
-                            @city.Temperature°C
-                        </div>
-
-                        <p class="text-sm text-gray-600">
-                            @forcastService.GetSummery(city.weathercode)
-                        </p>
                     </div>
+                }
+            </div>
+        }
 
-                </div>
-            }
-
-        </div>
         @if (SelectedCity?.Forecast != null)
         {
             <div class="mt-10">
@@ -85,9 +92,7 @@
 
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
 
-                    @foreach (var day in SelectedCity.Forecast
-                                    .SelectMany(f => f.Days)   // flatten all days
-                                    .Take(WeatherOptions.Value.ForcastMaxLimit))
+                    @foreach (var day in SelectedCity.Forecast.Days.Take(WeatherOptions.Value.ForcastMaxLimit))
                     {
                         <div class="bg-white rounded-xl p-4 shadow-md text-center">
 
@@ -105,11 +110,9 @@
 
                         </div>
                     }
-
                 </div>
             </div>
         }
-
     </div>
 </div>
 
@@ -121,16 +124,22 @@
     [Inject] private IForcastService forcastService { get; set; } = default!;
 
     private List<CityWeather> Cities = new List<CityWeather>();
-    
+
     private CityWeather? SelectedCity;
     private bool _initialized;
+    private bool isProcessing = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && !_initialized)
         {
             _initialized = true;
+            isProcessing = true;
+            StateHasChanged();
+
             Cities = await LoaderOptimizationList();
+
+            isProcessing = false;
             StateHasChanged();
         }
     }
@@ -141,46 +150,22 @@
         var favCities = await FavoriteService.GetAsync();
         foreach (var cit in favCities)
         {
-            var cityGeo = await searchCityService.SearchAsync(cit.Name);
-            var berlinWeather = await forcastService.GetWeatherAsync(
-                   cityGeo[0].Latitude,
-                   cityGeo[0].Longitude);
+            var forcast = await forcastService.GetWeatherAsync(cit.Latitude, cit.Longitude);
             result.Add(new()
             {
                 Name = cit.Name,
                 CityId = cit.CityId,
-                CountryCode = cityGeo[0].CountryCode,
-                Temperature = (berlinWeather.Days[0].MaxTemp).ToString(),
-                weathercode = berlinWeather.Days[0].WeatherCode,
-
+                CountryCode = cit?.CountryCode ?? "",
+                Temperature = forcast?.Days[0].MaxTemp.ToString() ?? "-",
+                weathercode = forcast?.Days[0].WeatherCode ?? 0,
+                Forecast = forcast
             });
         }
 
         return result;
     }
 
-    private async Task ToggleForecast(CityWeather city)
-    {
-        if (SelectedCity == city)
-        {
-            SelectedCity = null;
-            return;
-        }
-
-        if (city.Forecast == null)
-        {
-            var cityGeo = await searchCityService.SearchAsync(city.Name);
-            var weather = await forcastService.GetWeatherAsync(
-                   cityGeo[0].Latitude,
-                   cityGeo[0].Longitude);
-
-            // Assign the forecast to the city
-            city.Forecast = new List<ForecastResponseDto> { weather };
-        }
-
-        SelectedCity = city;
-    }
-
+    private void ToggleForecast(CityWeather city) => SelectedCity = SelectedCity == city ? null : city;
 
     // Remove a city from the list
     private async Task RemoveCity(CityWeather city)
@@ -195,17 +180,16 @@
         }
     }
 
-
     // City weather model
     public class CityWeather
     {
         public string Name { get; set; } = string.Empty;
         public int CityId { get; set; }
         public string CountryCode { get; set; } = string.Empty; // ISO 2-letter code
-        public string Temperature { get; set; }
+        public string Temperature { get; set; } = string.Empty;
         public int weathercode { get; set; }
         public bool ShowForecast { get; set; } = false;
-        public List<ForecastResponseDto>? Forecast { get; set; }
+        public ForecastResponseDto? Forecast { get; set; }
     }
 }
 

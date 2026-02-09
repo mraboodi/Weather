@@ -61,6 +61,7 @@ namespace Weather.Api.Controllers
 						f.GeoCity.Longitude,
 						f.GeoCity.Country,
 						f.GeoCity.State,
+						f.GeoCity.CountryCode
 					})
 					.ToListAsync();
 

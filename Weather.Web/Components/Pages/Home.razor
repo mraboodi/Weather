@@ -6,6 +6,8 @@
 @using Weather.Models.DTOs.Forcast
 @using Weather.Models.Entities
 @using Weather.Models.Entities.Favorite
+@using Weather.Models.Entities.Identity
+@using Weather.Web.Helpers
 @using Weather.Web.Interfaces
 @using Weather.Web.Interfaces.Identity
 @inject IOptions<WeatherOptions> WeatherOptions
@@ -39,8 +41,15 @@
                                       focus:outline-none focus:ring-3 focus:ring-sky-500/30 focus:border-sky-400
                                       shadow-sm transition-all duration-300 text-gray-800
                                       placeholder-gray-500" />
+                    @if (isSearching)
+                    {
+                        <div class="absolute right-3 top-1/2 -translate-y-1/2">
+                            <div class="animate-spin rounded-full h-5 w-5 border-2 border-sky-200 border-t-sky-500"></div>
+                        </div>
+                    }
 
-                    @if (showSuggestions && citySuggestions.Count > 0)
+
+                    @if (!isSearching && showSuggestions && citySuggestions.Count > 0)
                     {
                         <div class="absolute z-50 w-full mt-2 overflow-hidden bg-white/95 backdrop-blur-md
                                                 rounded-2xl shadow-2xl border border-gray-200/50 max-h-96">
@@ -113,11 +122,12 @@
                             @currentGeoCity.State, @currentGeoCity.Country
                         </p>
                     </div>
-
-                    <button @onclick="ToggleFavorite"
-                            style="border-radius: 0.75rem"
-                            disabled="@isProcessing"
-                            class="px-3 py-3.5 mr-4 rounded-2xl bg-gradient-to-r from-gray-100 to-gray-200
+                    @if (!AuthState.IsAuthenticated || (AuthState.IsAuthenticated && AuthState.UserHasAnyRole(UserRoles.SuperUser, UserRoles.Administrator)))
+                    {
+                        <button @onclick="ToggleFavorite"
+                        style="border-radius: 0.75rem"
+                        disabled="@isProcessing"
+                        class="px-3 py-3.5 mr-4 rounded-2xl bg-gradient-to-r from-gray-100 to-gray-200
                                        font-semibold hover:shadow-xl hover:shadow-gray-500/25
                                        hover:from-gray-200 hover:to-gray-300 active:scale-95
                                    transition-all duration-300 transform flex items-center gap-2
@@ -127,17 +137,18 @@
                                                                                                "bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 border border-gray-300/50")
                                    @(isProcessing ? "opacity-50 cursor-not-allowed" : "active:scale-95")
                                    flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2">
-                    @if (IsCurrentFavorite)
-                        {
-                            <span class="text-xl" title="Favorited">⭐</span>
-                            <span class="sm:hidden d-md-block">Favorited</span>
-                        }
-                        else
-                        {
-                            <span class="text-xl" title="Add to Favorites">☆</span>
-                            <span class="sm:hidden d-md-block">Add to Favorites</span>
-                        }
-                    </button>
+                            @if (IsCurrentFavorite)
+                            {
+                                <span class="text-xl" title="Favorited">⭐</span>
+                                <span class="sm:hidden d-md-block">Favorited</span>
+                            }
+                            else
+                            {
+                                <span class="text-xl" title="Add to Favorites">☆</span>
+                                <span class="sm:hidden d-md-block">Add to Favorites</span>
+                            }
+                        </button>
+                    }
                 </div>
             </div>
         }
@@ -290,6 +301,7 @@
     private bool IsCurrentFavorite => currentGeoCity != null && FavoriteState.IsFavorite(currentGeoCity.CityId);
     private bool showModal = false;
     private bool isLoading = false;
+    private bool isSearching = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -406,10 +418,24 @@
         try
         {
             await Task.Delay(300, searchCts.Token); // debounce
+
+            isSearching = true;            // 🔹 API fetch is about to start
+            showSuggestions = false;
+            StateHasChanged();
+
             citySuggestions = await CitySearch.SearchAsync(searchText);
+
             showSuggestions = citySuggestions.Count > 0;
         }
-        catch (TaskCanceledException) { }
+        catch (TaskCanceledException)
+        {
+            // debounce canceled → do nothing
+        }
+        finally
+        {
+            isSearching = false;           // 🔹 API finished
+            StateHasChanged();
+        }
     }
 
     private async Task SelectCity(GeoCity city)
