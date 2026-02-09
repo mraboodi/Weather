@@ -17,8 +17,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // 1. Database
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-//builder.Services.AddDbContext<AppDbContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
-builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString));
+builder.Services.AddDbContext<AppDbContext>(options => options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+//builder.Services.AddDbContext<AppDbContext>(options => options.UseSqlServer(connectionString)); // for SQL Server database
 
 // 2. Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
