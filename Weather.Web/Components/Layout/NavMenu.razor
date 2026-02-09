@@ -1,0 +1,120 @@
+﻿@using Microsoft.Extensions.Options
+@using Weather.Models.Configuration
+@using Weather.Models.Entities.Identity;
+@using Weather.Web.Helpers
+@using Weather.Web.Interfaces.Identity
+@inject IFavoriteState FavoriteState
+@inject IOptions<WeatherOptions> WeatherOptions
+@inject IAuthStateService AuthStateService
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href=""><i class="fas fa-cloud-sun me-2"></i>Weather Forecast</a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            </NavLink>
+        </div>
+
+        @* Only show Favorites if user is authenticated and SuperUser *@
+        @if (AuthStateService.IsAuthenticated)
+        {
+            @if (AuthStateService.UserHasAnyRole(UserRoles.SuperUser, UserRoles.Administrator))
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="/favorite-cities">
+                        <i class="fas fa-star me-3" aria-hidden="true"></i>
+                        <span class="flex gap-2 align-items-center">
+                            <span> Favorite Cities</span>
+
+                            @if (FavoriteState.Count > 0)
+                            {
+                                var badgeClass = FavoriteState.Count >= WeatherOptions.Value.FavoriteMaxLimit
+                                ? "bg-gradient-to-r from-red-400 to-red-500"
+                                : "bg-gradient-to-r from-sky-400 to-blue-500";
+
+                                <span class=" -right-4 px-2 text-xs font-bold text-white
+                                                                  rounded-full shadow-md @badgeClass">
+                                    @FavoriteState.Count
+                                    @if (FavoriteState.Count >= WeatherOptions.Value.FavoriteMaxLimit)
+                                    {
+                                        <span class="ml-1 text-xs">⛔</span>
+                                    }
+                                </span>
+                            }
+                        </span>
+                    </NavLink>
+                </div>
+
+                @if (AuthStateService.UserHasAnyRole(UserRoles.Administrator))
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/Register" Match="NavLinkMatch.All">
+                            <i class="fas fa-user-plus me-3" aria-hidden="true"></i> Add User
+                        </NavLink>
+                    </div>
+                }
+            }
+            <!-- Add divider here -->
+            <div class="px-3 py-2">
+                <div class="border-1 border-gray-200/50"></div>
+            </div>
+
+            <div class="nav-item px-3 mt-2">
+                <span class="text-sm font-medium">@AuthStateService.GetFirstName()</span>
+
+                <button type="button" @onclick="Logout"
+                        class="px-3 py-1 rounded bg-red-500 w-full text-white hover:bg-red-600 flex items-center gap-1">
+                    <i class="fas fa-sign-out-alt me-3" aria-hidden="true"></i> Logout
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="/Login" Match="NavLinkMatch.All">
+                    <i class="fas fa-sign-in-alt me-3" aria-hidden="true"></i> Login
+                </NavLink>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    
+    protected override async Task OnInitializedAsync()
+    {
+        AuthStateService.OnChange += HandleAuthChanged;       
+    }
+
+    private async void HandleAuthChanged()
+    {
+        if (AuthStateService.UserHasAnyRole(UserRoles.SuperUser, UserRoles.Administrator))
+        {
+            FavoriteState.OnChange += StateHasChanged;
+            await FavoriteState.LoadAsync();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+    public void Dispose()
+    {
+        if (AuthStateService.UserHasAnyRole(UserRoles.SuperUser, UserRoles.Administrator))
+            FavoriteState.OnChange -= HandleAuthChanged;
+    }
+
+    private async Task Logout()
+    {
+        await AuthStateService.LogoutAsync();
+        Nav.NavigateTo("/");
+    }
+}

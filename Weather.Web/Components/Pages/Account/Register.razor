@@ -1,0 +1,305 @@
+﻿@page "/register"
+@using Microsoft.Extensions.Options
+@using Weather.Models.Configuration
+@using Weather.Models.DTOs.Identity
+@using Weather.Models.Entities.Identity
+@using Weather.Web.Helpers
+@using Weather.Web.Interfaces.Identity
+@inject IAuthService AuthService
+@inject IAuthStateService AuthState
+@inject NavigationManager Nav
+@rendermode InteractiveServer
+@inject IOptions<WeatherOptions> WeatherOptions
+
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-0 rounded-lg">
+                <!-- Header with Image -->
+                <div class="card-header bg-primary text-white text-center py-4">
+                    <div class="d-flex justify-content-center mb-3">
+                        <div class="rounded-circle bg-white p-3 flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                            <i class="fas fa-user-plus fa-2x text-primary"></i>
+                        </div>
+                    </div>
+                    <h2 class="mb-0">Create Account</h2>
+                    <p class="mb-0 opacity-75">Join our community today</p>
+                </div>
+
+                <div class="card-body p-4 p-md-5">
+                    <EditForm Model="@regsiterModel" OnValidSubmit="HandleRegister"
+                              OnInvalidSubmit="HandleInvalid"
+                              FormName="RegisterForm">
+                        <DataAnnotationsValidator />
+
+                        <!-- Name Row -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold">First Name</label>
+                                <InputText @bind-Value="regsiterModel.FirstName"
+                                           class="form-control form-control-lg"
+                                           placeholder="Enter first name" />
+                                <ValidationMessage For="() => regsiterModel.FirstName" class="text-danger small" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold">Last Name</label>
+                                <InputText @bind-Value="regsiterModel.LastName"
+                                           class="form-control form-control-lg"
+                                           placeholder="Enter last name" />
+                                <ValidationMessage For="() => regsiterModel.LastName" class="text-danger small" />
+                            </div>
+                        </div>
+
+                        <!-- Email -->
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">Email Address</label>
+                            <InputText @bind-Value="regsiterModel.Email"
+                                       class="form-control form-control-lg"
+                                       placeholder="name@example.com" />
+                            <ValidationMessage For="() => regsiterModel.Email" class="text-danger small" />
+                        </div>
+
+                        <!-- Password -->
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold">Password</label>
+                                <div class="input-group">
+                                    <InputText @bind-Value="regsiterModel.Password"
+                                               type="password"
+                                               class="form-control form-control-lg"
+                                               placeholder="Create password" />
+                                </div>
+                                <ValidationMessage For="() => regsiterModel.Password" class="text-danger small" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold">Confirm Password</label>
+                                <div class="input-group">
+                                    <InputText @bind-Value="regsiterModel.RepeatPassword"
+                                               type="password"
+                                               class="form-control form-control-lg"
+                                               placeholder="Confirm password" />
+                                </div>
+                                <ValidationMessage For="() => regsiterModel.RepeatPassword" class="text-danger small" />
+                            </div>
+                        </div>
+
+                        <!-- User Role Selection for Favorite Saving (Only for Administrators) -->
+                        @if (AuthState.IsAuthenticated && AuthState.UserHasAnyRole(UserRoles.Administrator))
+                        {
+                            <div class="mb-4">
+                                <label class="form-label fw-semibold">User Permissions</label>
+                                <div class="card bg-light border-0">
+                                    <div class="card-body p-3">
+                                        <p class="text-muted small mb-3">
+                                            <i class="fas fa-user-shield me-1"></i>
+                                            Select the permission level for this user:
+                                        </p>
+
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input"
+                                                       type="radio"
+                                                       name="userRole"
+                                                       id="simpleUser"
+                                                       checked="@(regsiterModel.Role == UserRoles.SimpleUser)"
+                                                       @onchange="() => regsiterModel.Role = UserRoles.SimpleUser" />
+                                                <label class="form-check-label fw-semibold" for="simpleUser">
+                                                    <i class="fas fa-user me-2 text-secondary"></i>Simple User
+                                                    <span class="badge bg-secondary ms-2">Default</span>
+                                                </label>
+                                                <div class="ms-4 mt-1">
+                                                    <small class="text-muted">
+                                                        • Can view weather data<br>
+                                                        • Cannot save favorite cities<br>
+                                                        • Basic access only
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div class="form-check">
+                                                <input class="form-check-input"
+                                                       type="radio"
+                                                       name="userRole"
+                                                       id="superUser"
+                                                       checked="@(regsiterModel.Role == UserRoles.SuperUser)"
+                                                       @onchange="() => regsiterModel.Role = UserRoles.SuperUser" />
+                                                <label class="form-check-label fw-semibold" for="superUser">
+                                                    <i class="fas fa-star me-2 text-warning"></i>Super User (Can Save Favorites)
+                                                    <span class="badge bg-warning text-dark ms-2">Premium</span>
+                                                </label>
+                                                <div class="ms-4 mt-1">
+                                                    <small class="text-muted">
+                                                        • Can view weather data<br>
+                                                        • Can save favorite cities (up to @WeatherOptions.Value.FavoriteMaxLimit)<br>
+                                                        • Full access to all features
+                                                    </small>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Current selection indicator -->
+                                        <div class="mt-3 p-2 rounded @GetRoleBadgeClass()">
+                                            <small class="fw-semibold">
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                Selected:
+                                                @if (regsiterModel.Role == UserRoles.SimpleUser)
+                                                {
+                                                    <span>Simple User <i class="fas fa-user ms-1"></i></span>
+                                                }
+                                                else
+                                                {
+                                                    <span>Super User <i class="fas fa-star ms-1 text-warning"></i></span>
+                                                }
+                                                @if (regsiterModel.Role == UserRoles.SuperUser)
+                                                {
+                                                    <span class="ms-2">
+                                                        Can save up to @WeatherOptions.Value.FavoriteMaxLimit favorites!
+                                                    </span>
+                                                }
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (!AuthState.IsAuthenticated)
+                        {
+                            <!-- Info message for regular users -->
+                            <div class="alert alert-info mb-4">
+                                <div class="d-flex">
+                                    <i class="fas fa-info-circle fa-lg me-3 mt-1"></i>
+                                    <div>
+                                        <h6 class="alert-heading mb-1">Default Account Type</h6>
+                                        <p class="mb-0 small">
+                                            All new accounts are created as <strong>Simple Users</strong>.
+                                            Super Users can save up to @WeatherOptions.Value.FavoriteMaxLimit favorite cities.
+                                            To get Super User privileges, <a href="mailto:admin@weather.local">contact customer service.</a>.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Error Message -->
+                        @if (ErrorMessages?.Count == 1)
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                @ErrorMessages[0]
+                                <button type="button" class="btn-close" @onclick="() => ErrorMessages = null"></button>
+                            </div>
+                        }
+
+                        @if (ErrorMessages?.Count > 1)
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Important:
+                                <ul class="mb-0 list-disc pl-2 space-y-1">
+                                    @foreach (var error in ErrorMessages)
+                                    {
+                                        <li>@error</li>
+                                    }
+                                </ul>
+                                <button type="button" class="btn-close" @onclick="() => ErrorMessages = null"></button>
+                            </div>
+                        }
+
+
+                        <!-- Submit Button -->
+                        <div class="d-grid mb-3">
+                            <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold">
+                                <i class="fas fa-user-plus me-2"></i>Create Account
+                            </button>
+                        </div>
+
+                        @* <!-- Divider -->
+                        <div class="text-center my-4">
+                            <span class="text-muted">OR REGISTER WITH</span>
+                        </div>
+
+                        <!-- Social Login Buttons (Optional) -->
+                        <div class="row g-2 mb-4">
+                            <div class="col">
+                                <button type="button" class="btn btn-outline-primary w-100">
+                                    <i class="fab fa-google me-2"></i>Google
+                                </button>
+                            </div>
+                            <div class="col">
+                                <button type="button" class="btn btn-outline-dark w-100">
+                                    <i class="fab fa-github me-2"></i>GitHub
+                                </button>
+                            </div>
+                        </div> *@
+
+                        <!-- Login Link -->
+                        <div class="text-center">
+                            <p class="mb-0">
+                                Already have an account?
+                                <a href="/login" class="text-decoration-none fw-semibold">Sign In</a>
+                            </p>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegisterVM regsiterModel = new();
+    private List<string>? ErrorMessages;
+
+    private string GetRoleBadgeClass()
+    {
+        return regsiterModel.Role == UserRoles.SuperUser
+            ? "bg-warning-light text-warning-dark"
+            : "bg-secondary-light text-secondary-dark";
+    }
+
+    private async Task HandleRegister()
+    {
+        ErrorMessages = null;
+
+        if (regsiterModel.Password != regsiterModel.RepeatPassword)
+        {
+            ErrorMessages = new List<string> { "Passwords do not match." };
+            return;
+        }
+
+        var regDto = new RegisterDto
+        {
+            FirstName = regsiterModel.FirstName,
+            LastName = regsiterModel.LastName,
+            Email = regsiterModel.Email,
+            Password = regsiterModel.Password,
+            Role = regsiterModel.Role
+        };
+
+        var backendErrors = await AuthService.RegisterAsync(regDto);
+
+        if (backendErrors is not null && backendErrors.Any())
+        {
+            ErrorMessages = backendErrors.ToList();
+            return;
+        }
+
+        Nav.NavigateTo("/registrationSuccess");
+    }
+
+    private Task HandleInvalid(EditContext context)
+    {
+        // We can add logging or additional validation here
+        return Task.CompletedTask;
+    }
+
+    private class RegisterVM : RegisterDto
+    {
+        public string RepeatPassword { get; set; } = string.Empty;
+    }
+}
+

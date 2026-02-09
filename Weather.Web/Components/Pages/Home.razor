@@ -1,0 +1,467 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@using System.Text.Json
+@using Microsoft.Extensions.Options
+@using Weather.Models.Configuration
+@using Weather.Models.DTOs.Forcast
+@using Weather.Models.Entities
+@using Weather.Models.Entities.Favorite
+@using Weather.Web.Interfaces
+@using Weather.Web.Interfaces.Identity
+@inject IOptions<WeatherOptions> WeatherOptions
+@inject IAuthService AuthService
+@inject IAuthStateService AuthState
+@inject NavigationManager Nav
+
+<div class="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-100 p-0 sm:p-1">
+    <div class="max-w-6xl mx-auto px-3">
+
+        <!-- Header with Title -->
+        <div class="text-center space-y-3 pt-4 pb-2">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 bg-gradient-to-r from-sky-600 to-blue-700 bg-clip-text text-transparent">
+                Weather Forecast
+            </h1>
+            <p class="text-gray-600 max-w-2xl mx-auto">
+                Get accurate @(WeatherOptions.Value.ForcastMaxLimit)-day weather forecasts for any city worldwide
+            </p>
+        </div>
+
+        <!-- Search Section -->
+        <div class="space-y-6">
+            <div class="flex flex-col sm:flex-row gap-3 mb-8 justify-center">
+                <div class="relative w-full xs:w-60 sm:w-70 md:w-90 lg:w-100" @ref=" searchContainer">
+                    <input value="@searchText"
+                           @oninput="OnSearchInput"
+                           @onkeydown="HandleEnter"
+                           placeholder="Enter city name (e.g., Berlin, London, Cairo)"
+                           class="w-full pl-10 px-4 py-3 rounded-2xl border border-gray-300/80
+                                      bg-white/90 backdrop-blur-sm
+                                      focus:outline-none focus:ring-3 focus:ring-sky-500/30 focus:border-sky-400
+                                      shadow-sm transition-all duration-300 text-gray-800
+                                      placeholder-gray-500" />
+
+                    @if (showSuggestions && citySuggestions.Count > 0)
+                    {
+                        <div class="absolute z-50 w-full mt-2 overflow-hidden bg-white/95 backdrop-blur-md
+                                                rounded-2xl shadow-2xl border border-gray-200/50 max-h-96">
+                            <div class="overflow-y-auto max-h-96 custom-scrollbar py-1">
+                                @foreach (var city in citySuggestions)
+                                {
+                                    <div @onclick="() => SelectCity(city)"
+                                         class="px-4 py-3 cursor-pointer transition-all duration-200
+                                                                        hover:bg-sky-50/80 active:bg-sky-100 border-b border-gray-100/50
+                                                                        last:border-b-0 group">
+                                        <div class="font-medium text-gray-900 group-hover:text-sky-700">@city.Name</div>
+                                        <div class="text-sm text-gray-600 flex items-center gap-2">
+                                            <svg class="h-4 w-4" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                                            </svg>
+                                            @city.State, @city.Country
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+
+                <button @onclick="async () => await SearchWeather()"
+                        class="px-3 py-3.5 rounded-2xl bg-gradient-to-r from-sky-500 to-blue-600
+                               text-white font-semibold hover:shadow-xl hover:shadow-sky-500/25
+                               hover:from-sky-600 hover:to-blue-700 active:scale-95
+                               transition-all duration-300 transform flex items-center gap-2
+                               focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2
+                           "
+                        style="border-radius: 0.75rem">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                    <span class="sm:hidden d-md-block">Search</span>
+                </button>
+
+            </div>
+
+            @if (!string.IsNullOrEmpty(ErrorMessage))
+            {
+                <div class="mt-4 p-4 rounded-xl bg-red-50 border border-red-200
+                                        text-red-700 font-medium text-center shadow-sm max-w-md mx-auto
+                                        animate-pulse">
+                    <div class="flex items-center justify-center gap-2">
+                        <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                        </svg>
+                        @ErrorMessage
+                    </div>
+                </div>
+            }
+        </div>
+
+        <!-- Location Header with Favorite -->
+        @if (currentGeoCity != null)
+        {
+            <div class="mb-4 bg-white/80 backdrop-blur-lg rounded-2xl px-4 p-4 border border-white/50
+                                transform transition-all duration-500 animate-fade-in">
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-5 ">
+                    <div class="text-left sm:text-left">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center justify-center sm:justify-start gap-3">
+                            <svg class="h-7 w-7 text-sky-500" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                            </svg>
+                            @(WeatherOptions.Value.ForcastMaxLimit)-Day Forecast for @currentGeoCity.Name
+                        </h2>
+                        <p class="text-gray-600 text-left mt-2 pl-10 ml-1.5" >
+                            @currentGeoCity.State, @currentGeoCity.Country
+                        </p>
+                    </div>
+
+                    <button @onclick="ToggleFavorite"
+                            style="border-radius: 0.75rem"
+                            disabled="@isProcessing"
+                            class="px-3 py-3.5 mr-4 rounded-2xl bg-gradient-to-r from-gray-100 to-gray-200
+                                       font-semibold hover:shadow-xl hover:shadow-gray-500/25
+                                       hover:from-gray-200 hover:to-gray-300 active:scale-95
+                                   transition-all duration-300 transform flex items-center gap-2
+                                       focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2
+                                           @(IsCurrentFavorite ?
+                                                                                               "bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-500 hover:to-orange-500 shadow-lg shadow-yellow-500/20" :
+                                                                                               "bg-gradient-to-r from-gray-100 to-gray-200 hover:from-gray-200 hover:to-gray-300 border border-gray-300/50")
+                                   @(isProcessing ? "opacity-50 cursor-not-allowed" : "active:scale-95")
+                                   flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2">
+                    @if (IsCurrentFavorite)
+                        {
+                            <span class="text-xl" title="Favorited">⭐</span>
+                            <span class="sm:hidden d-md-block">Favorited</span>
+                        }
+                        else
+                        {
+                            <span class="text-xl" title="Add to Favorites">☆</span>
+                            <span class="sm:hidden d-md-block">Add to Favorites</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        }
+
+        @* <div class="flex items-center justify-center gap-4 mb-6">
+
+            <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 text-center">
+                @(WeatherOptions.Value.ForcastMaxLimit)-Day Weather Forecast for @currentGeoCity?.Name
+            </h1>
+
+            <button @onclick="ToggleFavorite"
+                    disabled="@isProcessing"
+                    class="px-4 py-2 rounded-xl font-semibold transition bg-yellow-400 text-white hover:bg-yellow-500">
+                @(IsCurrentFavorite ? "⭐ Favorited" : "☆ Add to Favorites")
+
+            </button>
+
+        </div> *@
+
+        <!-- Mobile first: 1 column, Weather Forecast Grid -->
+        @if (isLoading)
+        {
+            <div class="flex justify-center items-center h-64">
+                <div class="animate-spin rounded-full h-16 w-16 border-4 border-sky-200 border-t-sky-500"></div>
+            </div>
+        }
+        else if (ForecastDays != null && ForecastDays.Count > 0)
+        {
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
+                @foreach (var forecast in ForecastDays)
+                {
+                    <div class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-lg p-5
+                                                                                            transform transition-all duration-300 ease-out
+                                                                        hover:-translate-y-3 hover:scale-105
+                                                                        hover:shadow-2xl hover:bg-white">
+                        <div class="flex sm:block items-center justify-between text-center">
+                            <!-- Date Header -->
+                            <div>
+                                <h2 class="text-lg font-semibold text-gray-700">
+                                    @forecast.DateTime.ToString("ddd")
+                                </h2>
+                                <p class="text-sm text-gray-500">
+                                    @forecast.DateTime.ToString("MMM dd")
+                                </p>
+                            </div>
+
+                            <!-- Icon -->
+                            <div class="text-4xl sm:text-5xl transition-transform duration-300 hover:rotate-6">
+                                @Forcast.GetWeatherIcon(forecast.WeatherCode)
+                            </div>
+
+                            <!-- Temperature -->
+                            <div class="mt-2">
+                                <div class="text-xl sm:text-2xl font-bold text-gray-800">
+                                    @forecast.MaxTemp°C
+                                </div>
+                                <div class="text-xl sm:text-2xl font-bold text-gray-800">
+                                    @forecast.MinTemp°C
+                                </div>
+                                <p class="text-sm text-gray-600">
+                                    @Forcast.GetSummery(forecast.WeatherCode)
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+
+        }
+        else if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="text-center py-12">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+                    <svg class="h-8 w-8 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">No Weather Data</h3>
+                <p class="text-gray-600 max-w-md mx-auto">@ErrorMessage</p>
+            </div>
+            @* <div class="mb-6 p-4 rounded-xl bg-red-100 text-red-700 font-medium text-center shadow">
+                @ErrorMessage
+            </div> *@
+        }
+    </div>
+
+    @if (showModal)
+    {
+        <div class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50"
+             @onclick="ClosePopup">
+
+            <!-- Popup -->
+            <div class="bg-white w-96 p-6 rounded-2xl shadow-2xl relative
+                            transform transition-all duration-300 scale-100"
+                 @onclick:stopPropagation="true">
+
+                <!-- Close X -->
+                <button class="absolute top-3 right-3 text-gray-500 hover:text-gray-800"
+                        @onclick="ClosePopup">
+                    ✕
+                </button>
+
+                <h2 class="text-xl font-bold mb-4">Limit Reached</h2>
+
+                <p class="text-gray-600 mb-6">
+                    You reach the max number of allowed favorite cities (@WeatherOptions.Value.ForcastMaxLimit). Please remove one of the existing favorite cities to add a new one.
+                </p>
+
+                <div class="flex gap-3">
+                    <button @onclick="ClosePopup"
+                            class="flex-1 px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white
+                                           rounded-xl font-semibold transition-colors duration-200">
+                        OK
+                    </button>
+                    <button @onclick="ViewFavorites"
+                            class="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800
+                                           rounded-xl font-semibold transition-colors duration-200 border border-gray-300">
+                        View Favorites
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Inject] private ISearchCityService CitySearch { get; set; } = default!;
+    [Inject] private IForcastService Forcast { get; set; } = default!;
+    [Inject] private IFavoriteService FavoriteService { get; set; } = default!;
+    [Inject] private IFavoriteState FavoriteState { get; set; } = default!;
+
+    private ElementReference searchContainer;
+
+    [Inject] private IJSRuntime JS { get; set; }
+
+    private HashSet<int> favoriteCityIds = [];
+    private bool isFavorite;
+    private bool favoriteBusy;
+    private bool isProcessing = false;
+    private List<string> FavoriteCities = new();
+    private List<ForecastDayDto> ForecastDays { get; set; } = [];
+    private string? ErrorMessage;
+    private GeoCity? currentGeoCity;
+    private string searchText = string.Empty;
+    private List<GeoCity> citySuggestions = new();
+    private bool showSuggestions;
+
+    private CancellationTokenSource? searchCts;
+    private bool IsCurrentFavorite => currentGeoCity != null && FavoriteState.IsFavorite(currentGeoCity.CityId);
+    private bool showModal = false;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentGeoCity = WeatherOptions.Value.DefaultGeoCity;
+
+        if (currentGeoCity != null)
+        {
+            searchText = currentGeoCity.Name;
+            await LoadWeatherData();
+        }
+    }
+
+    private async Task LoadWeatherData()
+    {
+        if (currentGeoCity == null) return;
+
+        isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var response = await Forcast.GetWeatherAsync(
+                currentGeoCity.Latitude,
+                currentGeoCity.Longitude);
+
+            ForecastDays = response?.Days.ToList() ?? [];
+            ErrorMessage = ForecastDays.Count == 0 ? $"No weather data found for '{currentGeoCity.Name}'." : null;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Error loading weather data: {ex.Message}";
+            ForecastDays = [];
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+            await JS.InvokeVoidAsync("registerClickOutside", searchContainer,
+                DotNetObjectReference.Create(this));
+    }
+
+    [JSInvokable]
+    public void CloseSuggestions()
+    {
+        showSuggestions = false;
+        StateHasChanged();
+    }
+
+    private async Task GetWeather(GeoCity geoCity)
+    {
+        var response = await Forcast.GetWeatherAsync(geoCity.Latitude, geoCity.Longitude);
+
+        if (response == null || response.Days.Count == 0)
+        {
+            ForecastDays = [];
+            ErrorMessage = $"No weather found for '{geoCity.Name}'.";
+            return;
+        }
+
+        ErrorMessage = null;
+        ForecastDays = response.Days.ToList();
+    }
+
+    private async Task SearchWeather()
+    {
+        if (string.IsNullOrWhiteSpace(searchText))
+        {
+            ErrorMessage = "Please enter a city name";
+            return;
+        }
+
+        var cityGeo = await CitySearch.SearchAsync(searchText);
+        currentGeoCity = cityGeo.FirstOrDefault();
+        if (currentGeoCity == null)
+        {
+            ErrorMessage = "City not found. Please try another search.";
+            ForecastDays = [];
+            StateHasChanged();
+            return;
+        }
+
+        await GetWeather(currentGeoCity);
+    }
+
+    private void ClosePopup()
+    {
+        showModal = false;
+        isProcessing = false;
+        StateHasChanged();
+    }
+
+    private async Task HandleEnter(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && currentGeoCity != null)
+        {
+            showSuggestions = false;
+            await SearchWeather();
+        }
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchText = e.Value?.ToString() ?? string.Empty;
+
+        searchCts?.Cancel();
+        searchCts = new CancellationTokenSource();
+
+        try
+        {
+            await Task.Delay(300, searchCts.Token); // debounce
+            citySuggestions = await CitySearch.SearchAsync(searchText);
+            showSuggestions = citySuggestions.Count > 0;
+        }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task SelectCity(GeoCity city)
+    {
+        currentGeoCity = city;
+        searchText = city.Name;
+        showSuggestions = false;
+        citySuggestions.Clear();
+
+        await GetWeather(currentGeoCity);
+        StateHasChanged();
+    }
+
+
+    private async Task ToggleFavorite()
+    {
+        if (currentGeoCity == null) return;
+
+        if (!AuthState.IsAuthenticated)
+        {
+            Nav.NavigateTo("/login");
+            return;
+        }
+
+        if (currentGeoCity == null) return;
+
+        if (FavoriteState.IsFavorite(currentGeoCity.CityId))
+        {
+            await FavoriteState.RemoveAsync(currentGeoCity.CityId);
+            isProcessing = false;
+            StateHasChanged();
+            return;
+        }
+
+        // Check if we can add new favorite
+        var favCities = await FavoriteService.GetAsync();
+        if (favCities.Count >= 5)
+        {
+            isProcessing = true;
+            showModal = true;
+            StateHasChanged();
+            return;
+        }
+
+        await FavoriteState.AddAsync(currentGeoCity);
+        StateHasChanged();
+    }
+
+    private void ViewFavorites()
+    {
+        Nav.NavigateTo("/favorite-cities");
+        ClosePopup();
+    }
+
+}

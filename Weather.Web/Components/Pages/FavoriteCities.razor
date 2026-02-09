@@ -1,0 +1,211 @@
+﻿@page "/favorite-cities"
+@using Microsoft.Extensions.Options
+@using Weather.Models.Configuration
+@using Weather.Models.DTOs.Forcast
+@using Weather.Models.Entities.Identity
+@using Weather.Web.Interfaces
+@using Weather.Web.Interfaces.Identity
+@using Weather.Web.Helpers
+@inject IFavoriteState FavoriteState
+@inject IAuthStateService AuthStateService
+@inject IOptions<WeatherOptions> WeatherOptions
+@rendermode InteractiveServer
+
+<div class="min-h-screen bg-gradient-to-br from-sky-50 via-white to-blue-100 p-3 sm:p-1">
+    <div class="max-w-6xl mx-auto">
+
+        <!-- Page Title -->
+        @* <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mb-8 text-center">
+            Today's Weather in Fovorite Cities
+        </h1> *@
+        <div class="text-center space-y-3 pt-2 pb-4">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 bg-gradient-to-r from-sky-600 to-blue-700 bg-clip-text text-transparent">
+                Today's Weather in Fovorite Cities
+            </h1>
+        </div>
+
+        <!-- Cities Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+
+            @foreach (var city in Cities)
+            {
+                <div class="bg-white/80 backdrop-blur-lg rounded-2xl shadow-md overflow-hidden
+                    transform transition-all duration-300 ease-out
+                    hover:-translate-y-3 hover:scale-105
+                            hover:shadow-2xl relative group cursor-pointer" @onclick="() => ToggleForecast(city)">
+
+                    <!-- Remove Button -->
+                    <button @onclick="() => RemoveCity(city)" @onclick:stopPropagation
+                            class="absolute top-3 right-3 w-9 h-9 flex items-center justify-center
+                       bg-red-500 text-white rounded-full shadow-md z-10
+                       /* Default (Mobile): Visible */
+                       block
+                       /* Desktop (md = 768px+): Hide by default, show only on group-hover */
+                       md:hidden md:group-hover:flex
+                       transition-all duration-200"
+                            style="border-radius: 10px">
+                        <span class="text-lg font-bold">✕</span>
+                    </button>
+
+                    <!-- City Weather Content -->
+                    <div class="p-5 text-center">
+                        <div class="flex justify-center mb-2">
+                            <img src="https://flagcdn.com/w80/@(city.CountryCode.ToLower()).png"
+                                 alt="@city.Name"
+                                 class="w-10 shadow-sm rounded-sm" />
+                        </div>
+
+                        <div class="text-4xl my-2">
+                            @city.Name
+                        </div>
+
+                        <div class="text-4xl my-2">
+                            @forcastService.GetWeatherIcon(city.weathercode)
+                        </div>
+
+                        <div class="text-xl font-bold text-gray-900">
+                            @city.Temperature°C
+                        </div>
+
+                        <p class="text-sm text-gray-600">
+                            @forcastService.GetSummery(city.weathercode)
+                        </p>
+                    </div>
+
+                </div>
+            }
+
+        </div>
+        @if (SelectedCity?.Forecast != null)
+        {
+            <div class="mt-10">
+                <h2 class="text-xl font-semibold text-center mb-4">
+                    @(WeatherOptions.Value.ForcastMaxLimit)-Day Forecast for @SelectedCity.Name
+                </h2>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+
+                    @foreach (var day in SelectedCity.Forecast
+                                    .SelectMany(f => f.Days)   // flatten all days
+                                    .Take(WeatherOptions.Value.ForcastMaxLimit))
+                    {
+                        <div class="bg-white rounded-xl p-4 shadow-md text-center">
+
+                            <div class="font-semibold text-sm">
+                                @day.DateTime.Date.ToString("ddd")
+                            </div>
+
+                            <div class="text-3xl my-2">
+                                @forcastService.GetWeatherIcon(day.WeatherCode)
+                            </div>
+
+                            <div class="text-sm text-gray-700">
+                                @day.MaxTemp°C / @day.MinTemp°C
+                            </div>
+
+                        </div>
+                    }
+
+                </div>
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+    [Inject] private IFavoriteService FavoriteService { get; set; } = default!;
+
+    [Inject] private ISearchCityService searchCityService { get; set; } = default!;
+
+    [Inject] private IForcastService forcastService { get; set; } = default!;
+
+    private List<CityWeather> Cities = new List<CityWeather>();
+    
+    private CityWeather? SelectedCity;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_initialized)
+        {
+            _initialized = true;
+            Cities = await LoaderOptimizationList();
+            StateHasChanged();
+        }
+    }
+
+    private async Task<List<CityWeather>> LoaderOptimizationList()
+    {
+        List<CityWeather> result = new List<CityWeather>();
+        var favCities = await FavoriteService.GetAsync();
+        foreach (var cit in favCities)
+        {
+            var cityGeo = await searchCityService.SearchAsync(cit.Name);
+            var berlinWeather = await forcastService.GetWeatherAsync(
+                   cityGeo[0].Latitude,
+                   cityGeo[0].Longitude);
+            result.Add(new()
+            {
+                Name = cit.Name,
+                CityId = cit.CityId,
+                CountryCode = cityGeo[0].CountryCode,
+                Temperature = (berlinWeather.Days[0].MaxTemp).ToString(),
+                weathercode = berlinWeather.Days[0].WeatherCode,
+
+            });
+        }
+
+        return result;
+    }
+
+    private async Task ToggleForecast(CityWeather city)
+    {
+        if (SelectedCity == city)
+        {
+            SelectedCity = null;
+            return;
+        }
+
+        if (city.Forecast == null)
+        {
+            var cityGeo = await searchCityService.SearchAsync(city.Name);
+            var weather = await forcastService.GetWeatherAsync(
+                   cityGeo[0].Latitude,
+                   cityGeo[0].Longitude);
+
+            // Assign the forecast to the city
+            city.Forecast = new List<ForecastResponseDto> { weather };
+        }
+
+        SelectedCity = city;
+    }
+
+
+    // Remove a city from the list
+    private async Task RemoveCity(CityWeather city)
+    {
+        if (Cities.Contains(city))
+        {
+            Cities.Remove(city);
+            await FavoriteService.RemoveAsync(city.CityId);
+            await FavoriteState.LoadAsync();
+            // CitiesState.SetCount(Cities.Count);
+            StateHasChanged();
+        }
+    }
+
+
+    // City weather model
+    public class CityWeather
+    {
+        public string Name { get; set; } = string.Empty;
+        public int CityId { get; set; }
+        public string CountryCode { get; set; } = string.Empty; // ISO 2-letter code
+        public string Temperature { get; set; }
+        public int weathercode { get; set; }
+        public bool ShowForecast { get; set; } = false;
+        public List<ForecastResponseDto>? Forecast { get; set; }
+    }
+}
+
